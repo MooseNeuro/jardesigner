@@ -70,13 +70,21 @@ const downloadCSV = (plotData) => {
 const SinglePlot = ({ plotData }) => {
   const { ref, width, height } = useContainerSize();
 
+  // Legend visibility — default on when there are multiple sub-plots
+  const [showLegend, setShowLegend] = useState(() => plotData?.numSubPlots > 1);
+
+  // Ref so the modebar button click handler always calls the latest toggle
+  // without needing to be recreated on every render.
+  const toggleLegendRef = useRef();
+  toggleLegendRef.current = () => setShowLegend(v => !v);
+
   // Prepare Data for Plotly
   const { traces, layout } = useMemo(() => {
     if (!plotData || !plotData.val) return { traces: [], layout: {} };
 
     const dt = plotData.dt;
     const numPoints = plotData.val[0].length;
-    
+
     // Generate X-axis (Time) ONCE
     const timeArray = new Float32Array(numPoints);
     for(let i=0; i<numPoints; i++) timeArray[i] = i * dt;
@@ -94,33 +102,43 @@ const SinglePlot = ({ plotData }) => {
     // Layout Config
     const layout = {
       // Explicitly set dimensions to match container
-      width: width, 
+      width: width,
       height: height,
       title: {
           text: plotData.title,
-          font: { size: 28, weight: 'bold' } 
+          font: { size: 28, weight: 'bold' }
       },
       xaxis: {
         title: {
             text: plotData.xlabel,
-            font: { size: 28 } 
+            font: { size: 28 }
         },
-        tickfont: { size: 24 }, 
+        tickfont: { size: 24 },
+        ticks: 'outside',
+        ticklen: 8,
+        tickwidth: 2,
+        showline: true,
+        linewidth: 2,
         automargin: true,
         zeroline: true,
       },
       yaxis: {
         title: {
             text: plotData.ylabel,
-            font: { size: 28 } 
+            font: { size: 28 }
         },
-        tickfont: { size: 24 }, 
+        tickfont: { size: 24 },
+        ticks: 'outside',
+        ticklen: 8,
+        tickwidth: 2,
+        showline: true,
+        linewidth: 2,
         automargin: true,
         zeroline: true,
       },
-      font: { family: 'Arial, sans-serif', size: 20 }, 
+      font: { family: 'Arial, sans-serif', size: 20 },
       margin: { l: 80, r: 40, b: 80, t: 60 },
-      showlegend: plotData.numSubPlots > 1,
+      showlegend: showLegend,
       autosize: false, // We handle sizing manually
       legend: {
           font: { size: 20 }
@@ -128,12 +146,21 @@ const SinglePlot = ({ plotData }) => {
     };
 
     return { traces, layout };
-  }, [plotData, width, height]);
+  }, [plotData, width, height, showLegend]);
 
-  const config = {
+  const config = useMemo(() => ({
       responsive: false, // Turned off because we are handling it manually
       displaylogo: false,
       modeBarButtonsToAdd: [
+        {
+          // Toggle legend visibility. Icon: 3 rows of colour-swatch + label line.
+          name: 'Toggle Legend',
+          icon: {
+            width: 512, height: 512,
+            path: 'M32 144 h64 v64 H32 Z M128 160 h352 v32 H128 Z M32 272 h64 v64 H32 Z M128 288 h352 v32 H128 Z M32 400 h64 v64 H32 Z M128 416 h352 v32 H128 Z'
+          },
+          click: () => toggleLegendRef.current()
+        },
         {
           name: 'Download CSV',
           icon: {
@@ -143,7 +170,7 @@ const SinglePlot = ({ plotData }) => {
           click: () => downloadCSV(plotData)
         }
       ]
-  };
+  }), [plotData]);
 
   return (
     <div ref={ref} style={{ width: '100%', height: '100%' }}>

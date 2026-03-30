@@ -536,6 +536,11 @@ const ChemMenuBox = ({
                                 onChange={(id,v) => handlePathChange(activeDistribution, v)} 
                                 helptext={helpText.distributions.path}
                              >
+                                {activeDistribData.path &&
+                                 !pathOptions.includes(activeDistribData.path) &&
+                                 activeDistribData.path !== OPTION_USER_SPECIFIED && (
+                                    <MenuItem key="__current__" value={activeDistribData.path}>{activeDistribData.path}</MenuItem>
+                                )}
                                 {pathOptions.map(opt => (
                                     <MenuItem key={opt} value={opt}>{opt}</MenuItem>
                                 ))}

@@ -3,6 +3,9 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
 import { getColor } from './colormap';
 import { createShape } from './ShapeFactory';
 
+// D: Emissive factor — adds self-glow proportional to object color for vibrancy.
+const EMISSIVE_FACTOR = 0.25;
+
 export default class ThreeDManager {
   constructor(container, onSelectionChange) {
     this.container = container;
@@ -44,20 +47,19 @@ export default class ThreeDManager {
     this.raycaster = new THREE.Raycaster();
     this.mouse = new THREE.Vector2();
 
-    // --- UPDATED LIGHTING (VPython Defaults) ---
-    // VPython default: Ambient 0.2 gray
-    this.world.add(new THREE.AmbientLight(0x333333));
+    // Lighting: VPython directions, boosted ambient and fill for more brightness.
+    // A: Ambient at 0x5d5d5d (37%) — midpoint between original 20% and boosted 53%.
+    this.world.add(new THREE.AmbientLight(0x5d5d5d));
 
-    // VPython default: Distant light 1 (Direction <0.22, 0.44, 0.88>, Color 0.8 gray)
+    // Main light (direction <0.22, 0.44, 0.88>, 80% gray)
     const light1 = new THREE.DirectionalLight(0xcccccc, 1.0);
     light1.position.set(0.22, 0.44, 0.88).normalize();
     this.world.add(light1);
 
-    // VPython default: Distant light 2 (Direction <-0.88, -0.22, -0.44>, Color 0.3 gray)
-    const light2 = new THREE.DirectionalLight(0x4d4d4d, 1.0);
+    // B: Fill light at 0x737373 (45%) — midpoint between original 30% and boosted 60%.
+    const light2 = new THREE.DirectionalLight(0x737373, 1.0);
     light2.position.set(-0.88, -0.22, -0.44).normalize();
     this.world.add(light2);
-    // --- END UPDATED LIGHTING ---
 
     this.onWindowResize = this.onWindowResize.bind(this);
     this.handleKeyDown = this.handleKeyDown.bind(this);
@@ -190,12 +192,14 @@ export default class ThreeDManager {
         const materialColor = getColor(normalizedValue, config.colormap, true);
         
         // Default to Matte (roughness 0.8) initially
+        const emissiveColor = new THREE.Color(materialColor).multiplyScalar(EMISSIVE_FACTOR);
         const material = new THREE.MeshStandardMaterial({
-            color: materialColor, 
-            transparent: true, 
+            color: materialColor,
+            emissive: emissiveColor,
+            transparent: true,
             opacity: entity.transparency || 1.0,
             metalness: 0.0,
-            roughness: 0.8, 
+            roughness: 0.8,
         });
 
         const shapeObject = createShape(primitive, material);
@@ -271,8 +275,9 @@ export default class ThreeDManager {
         if (config) {
             const normalizedValue = (obj.userData.originalValue - config.vmin) / (config.vmax - config.vmin);
             const newColor = getColor(normalizedValue, config.colormap, true);
-            if (obj.material) { 
+            if (obj.material) {
                 obj.material.color.set(newColor);
+                obj.material.emissive.set(newColor).multiplyScalar(EMISSIVE_FACTOR);
             }
         }
     });
@@ -291,6 +296,7 @@ export default class ThreeDManager {
             const newColor = getColor(normalizedValue, colormap, true);
             if (obj.material) {
                 obj.material.color.set(newColor);
+                obj.material.emissive.set(newColor).multiplyScalar(EMISSIVE_FACTOR);
             }
         }
     });
@@ -355,6 +361,7 @@ export default class ThreeDManager {
             const newColor = getColor(normalizedValue, config.colormap, true);
             if (obj.material) {
                 obj.material.color.set(newColor);
+                obj.material.emissive.set(newColor).multiplyScalar(EMISSIVE_FACTOR);
                 obj.material.needsUpdate = true;
             }
         }

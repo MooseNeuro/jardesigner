@@ -14,6 +14,7 @@ const MemoizedReactionGraph = memo(ReactionGraph);
 const DisplayWindow = (props) => {
   const {
     jsonContent,
+    jsonData,
     setActiveMenu,
     plotDataUrl,
     isPlotReady,
@@ -32,13 +33,13 @@ const DisplayWindow = (props) => {
     handleSeekReplay,
     clientId,
     isSimulating,
-    // 1. NEW: Receive the graph data from appLogic
     reactionGraphs
   } = props;
 
   // ... (Keep all existing hooks/logic exactly as is) ...
   const [tabIndex, setTabIndex] = useState(0);
   const prevThreeDConfigSetup = useRef();
+  const prevIsSimulating = useRef(false);
 
   useEffect(() => {
     const hasNewSetupConfig = threeDConfigs?.setup && !prevThreeDConfigSetup.current;
@@ -47,6 +48,15 @@ const DisplayWindow = (props) => {
     }
     prevThreeDConfigSetup.current = threeDConfigs?.setup;
   }, [threeDConfigs?.setup]);
+
+  // When a run starts, switch to Graph if plots are defined, else Run 3D.
+  useEffect(() => {
+    if (!prevIsSimulating.current && isSimulating) {
+      const hasPlots = jsonData?.plots?.length > 0;
+      setTabIndex(hasPlots ? 0 : 4);
+    }
+    prevIsSimulating.current = isSimulating;
+  }, [isSimulating, jsonData?.plots?.length]);
 
   const handleTabChange = (event, newValue) => {
     setTabIndex(newValue);

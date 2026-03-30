@@ -101,11 +101,8 @@ const RunMenuBox = ({
     const canPause = isSimulating && !isPaused;
     const canResume = isPaused;
 
-    // Use a ref to store the onConfigurationChange function to use in the cleanup effect
     const onConfigurationChangeRef = useRef(onConfigurationChange);
-    useEffect(() => {
-        onConfigurationChangeRef.current = onConfigurationChange;
-    }, [onConfigurationChange]);
+    useEffect(() => { onConfigurationChangeRef.current = onConfigurationChange; }, [onConfigurationChange]);
     
     useEffect(() => {
         if (isReplaying) {
@@ -162,15 +159,20 @@ const RunMenuBox = ({
         };
     }, [runtime, clocks, configSettings]);
 
-    // This effect now only saves the config when the menu box is closed (unmounted).
+    // Ref updated every render so the unmount cleanup always calls the latest version.
+    const buildConfigPayloadRef = useRef(buildConfigPayload);
+    buildConfigPayloadRef.current = buildConfigPayload;
+
+    // Save config to parent only when this menu box is closed (unmounted).
+    // Empty dep array: the cleanup only runs on unmount, not on every local state change.
+    // buildConfigPayloadRef ensures we always call the latest version on unmount.
     useEffect(() => {
-        const payload = buildConfigPayload();
         return () => {
             if (onConfigurationChangeRef.current) {
-                onConfigurationChangeRef.current(payload);
+                onConfigurationChangeRef.current(buildConfigPayloadRef.current());
             }
         };
-    }, [buildConfigPayload]);
+    }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
     const handleStart = () => {
         // If paused, resume instead of starting fresh

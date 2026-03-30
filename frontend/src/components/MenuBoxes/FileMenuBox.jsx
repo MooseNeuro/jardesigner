@@ -46,6 +46,11 @@ const FileMenuBox = ({ setJsonContent, currentConfig, getCurrentJsonData, client
 
     const handleQuit = () => {
         window.close();
+        // If the window wasn't opened by JavaScript, close() is blocked by the browser.
+        // The timeout only fires if the window is still open.
+        setTimeout(() => {
+            alert("Please close this tab manually (Ctrl+W or Cmd+W).");
+        }, 500);
     };
 
     const handleLoadModel = (event) => {

@@ -396,6 +396,11 @@ const ElecMenuBox = ({
                                 onChange={(id,v) => handlePathChange(activeDistribution, v)} 
                                 helptext={helpText.distributions.path}
                              >
+                                {distributions[activeDistribution].path &&
+                                 !pathOptions.includes(distributions[activeDistribution].path) &&
+                                 distributions[activeDistribution].path !== OPTION_USER_SPECIFIED && (
+                                    <MenuItem key="__current__" value={distributions[activeDistribution].path}>{distributions[activeDistribution].path}</MenuItem>
+                                )}
                                 {pathOptions.map(opt => (
                                     <MenuItem key={opt} value={opt}>{opt}</MenuItem>
                                 ))}

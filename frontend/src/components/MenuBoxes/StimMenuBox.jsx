@@ -23,7 +23,7 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import helpText from './StimMenuBox.Help.json';
-import { OPTION_USER_SPECIFIED } from '../../utils/menuHelpers';
+import { getCompartmentOptions, OPTION_USER_SPECIFIED } from '../../utils/menuHelpers';
 
 // --- Define fieldOptions and typeOptions outside ---
 const nonChemFieldOptions = ['inject', 'vclamp', 'activation', 'modulation'];
@@ -232,20 +232,11 @@ const StimMenuBox = ({
         return Object.keys(meshMols).sort();
     }, [meshMols]);
 
-    // Combined elecPaths and spinePaths for Parent Elec Compartment
-    const elecCompartmentOptions = useMemo(() => {
-        const opts = new Set(['soma']); // Default always available
-        
-        if (Array.isArray(elecPaths)) {
-            elecPaths.forEach(p => opts.add(p));
-        }
-        
-        if (Array.isArray(spinePaths)) {
-            spinePaths.forEach(p => opts.add(p));
-        }
-        
-        return Array.from(opts).sort();
-    }, [elecPaths, spinePaths]);
+    // Build the Parent Elec Compartment dropdown options via the shared helper.
+    // Shafts are filtered, base# wildcards added, individuals capped at 10.
+    const elecCompartmentOptions = useMemo(() =>
+        getCompartmentOptions([...elecPaths, ...spinePaths]),
+    [elecPaths, spinePaths]);
 
     // Get active plot data
     const activeStimData = stims[activeStim];
@@ -374,9 +365,13 @@ const StimMenuBox = ({
                                 onChange={(id, v) => handlePathChange({ target: { value: v } })} 
                                 helptext={helpText.fields.path}
                               >
+                                  {/* If the current value was user-typed, show it so MUI can display it as selected */}
+                                  {activeStimData.path &&
+                                   !elecCompartmentOptions.includes(activeStimData.path) &&
+                                   activeStimData.path !== OPTION_USER_SPECIFIED && (
+                                      <MenuItem key="__current__" value={activeStimData.path}>{activeStimData.path}</MenuItem>
+                                  )}
                                   {elecCompartmentOptions.map(opt => <MenuItem key={opt} value={opt}>{opt}</MenuItem>)}
-                                  <Divider />
-                                  <MenuItem value={OPTION_USER_SPECIFIED}>{OPTION_USER_SPECIFIED}</MenuItem>
                               </HelpField>
                           </Grid>
 

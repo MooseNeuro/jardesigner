@@ -196,9 +196,12 @@ const PassiveMenuBox = ({
                                 onChange={handlePathChange} 
                                 helptext={helpText.fields.path} 
                             >
+                                {activeTabData.path &&
+                                 !pathOptions.includes(activeTabData.path) &&
+                                 activeTabData.path !== OPTION_USER_SPECIFIED && (
+                                    <MenuItem key="__current__" value={activeTabData.path}>{activeTabData.path}</MenuItem>
+                                )}
                                 {pathOptions.map(opt => <MenuItem key={opt} value={opt}>{opt}</MenuItem>)}
-                                <Divider />
-                                <MenuItem value={OPTION_USER_SPECIFIED}>{OPTION_USER_SPECIFIED}</MenuItem>
                             </HelpField>
                         </Grid>
 

@@ -142,6 +142,7 @@ const PlotMenuBox = ({
     const [customPathDialogOpen, setCustomPathDialogOpen] = useState(false);
     const [tempCustomPath, setTempCustomPath] = useState('');
     const [pendingPlotIndex, setPendingPlotIndex] = useState(null);
+    const [dialogField, setDialogField] = useState('path'); // 'path' or 'childPath'
 
     const onConfigurationChangeRef = useRef(onConfigurationChange);
     useEffect(() => { onConfigurationChangeRef.current = onConfigurationChange; }, [onConfigurationChange]);
@@ -220,6 +221,7 @@ const PlotMenuBox = ({
     const handlePathChange = (index, newValue) => {
         if (newValue === OPTION_USER_SPECIFIED) {
             setPendingPlotIndex(index);
+            setDialogField('path');
             setTempCustomPath('');
             setCustomPathDialogOpen(true);
         } else {
@@ -229,10 +231,21 @@ const PlotMenuBox = ({
 
     const handleSaveCustomPath = () => {
         if (pendingPlotIndex !== null && tempCustomPath.trim() !== "") {
-            updatePlot(pendingPlotIndex, 'path', tempCustomPath.trim());
+            updatePlot(pendingPlotIndex, dialogField, tempCustomPath.trim());
         }
         setCustomPathDialogOpen(false);
         setPendingPlotIndex(null);
+    };
+
+    const handleChildPathChange = (index, newValue) => {
+        if (newValue === OPTION_USER_SPECIFIED) {
+            setPendingPlotIndex(index);
+            setDialogField('childPath');
+            setTempCustomPath('');
+            setCustomPathDialogOpen(true);
+        } else {
+            updatePlot(index, 'childPath', newValue);
+        }
     };
 
     const chemCompartmentOptions = useMemo(() => {
@@ -347,6 +360,11 @@ const PlotMenuBox = ({
                                 onChange={(id,v) => handlePathChange(activePlot, v)} 
                                 helptext={helpText.fields.path}
                              >
+                                {activePlotData.path &&
+                                 !pathOptions.includes(activePlotData.path) &&
+                                 activePlotData.path !== OPTION_USER_SPECIFIED && (
+                                    <MenuItem key="__current__" value={activePlotData.path}>{activePlotData.path}</MenuItem>
+                                )}
                                 {pathOptions.map(opt => (
                                     <MenuItem key={opt} value={opt}>{opt}</MenuItem>
                                 ))}
@@ -416,18 +434,24 @@ const PlotMenuBox = ({
                              <>
                                  {/* Relative Path as Menu for Non-Chem Fields */}
                                  <Grid item xs={12} sm={6}>
-                                    <HelpField 
-                                        id="childPath" 
-                                        label="Relative Path (Optional)" 
+                                    <HelpField
+                                        id="childPath"
+                                        label="Relative Path (Optional)"
                                         select
-                                        value={activePlotData.childPath} 
-                                        onChange={(id, v) => updatePlot(activePlot, id, v)} 
+                                        value={activePlotData.childPath}
+                                        onChange={(id, v) => handleChildPathChange(activePlot, v)}
                                         helptext={helpText.fields.childPath}
                                     >
                                         <MenuItem value=""><em>None</em></MenuItem>
+                                        {activePlotData.childPath &&
+                                         !channelPrototypes.includes(activePlotData.childPath) &&
+                                         activePlotData.childPath !== OPTION_USER_SPECIFIED && (
+                                            <MenuItem key="__current_child__" value={activePlotData.childPath}>{activePlotData.childPath}</MenuItem>
+                                        )}
                                         {channelPrototypes.map(chan => (
                                             <MenuItem key={chan} value={chan}>{chan}</MenuItem>
                                         ))}
+                                        <MenuItem value={OPTION_USER_SPECIFIED}>{OPTION_USER_SPECIFIED}</MenuItem>
                                     </HelpField>
                                 </Grid>
                              </>
@@ -456,7 +480,7 @@ const PlotMenuBox = ({
 
              {/* Dialog for User Specified Path */}
             <Dialog open={customPathDialogOpen} onClose={() => setCustomPathDialogOpen(false)}>
-                <DialogTitle>Enter User Specified Path</DialogTitle>
+                <DialogTitle>Enter {dialogField === 'path' ? 'Parent Elec Compartment' : 'Relative Path'}</DialogTitle>
                 <DialogContent>
                     <TextField
                         autoFocus

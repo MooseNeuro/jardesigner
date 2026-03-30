@@ -62,12 +62,13 @@ FaradayConst = 96485.3365 # Coulomb/mol
 #CA_SCALE     = 25000 # Ratio of Traub units to mM. 250::0.01
 CA_SCALE     = 1.0 # I have now set sensible ranges in the KCA and KAHP
 
-RM = 1.0
-RA = 10.0
-CM = 0.01
 def make_axon( dia = 10e-6, comptLen = 10e-6, numAxonSegments = 200):
+    RM = 1.0
+    RA = 10.0
+    CM = 0.01
+    comptDia = 2e-6
     axon = moose.Neuron( '/library/axon' )
-    prev = rd.buildCompt( axon, 'soma', RM = 1.0, RA = 10.0, CM = 0.01, 
+    prev = rd.buildCompt( axon, 'soma', RM = RM, RA = RA, CM = CM,
             dia = 10e-6, x=0, dx=comptLen)
     theta = 0
     x = comptLen
@@ -86,13 +87,20 @@ def make_axon( dia = 10e-6, comptLen = 10e-6, numAxonSegments = 200):
     
     return axon
 
-def make_myeliated_axon(comptLen = 10e-6, comptDia = 2e-6, 
+def make_myelinated_axon(comptLen = 10e-6, comptDia = 2e-6, 
         numAxonSegments = 405, nodeSpacing=100):
+    nodeDia = 1e-6
+    nodeRM = 1.0
+    nodeCM = 0.01
+    RM = 100
+    RA = 5
+    CM = 0.001
+
     axon = moose.Neuron( '/library/myelinated_axon' )
     x = 0.0
     y = 0.0
     # Note how the membrane passive properties are different.
-    prev = rd.buildCompt( axon, 'soma', RM = 100, RA = 5, CM = 0.001, dia = 10e-6, x=0, dx=comptLen)
+    prev = rd.buildCompt( axon, 'soma', RM = RM, RA = RA, CM = CM, dia = 10e-6, x=0, dx=comptLen)
     theta = 0
     x = comptLen
 
@@ -597,6 +605,9 @@ def makeChemBistable( name = 'bis', parent = '/library' ):
 
     in sum, **b** has a positive feedback onto itself, consuming **a**
     **c** converts **b** back into **a**.
+
+    I have added an 'on' MM enzyme to convert **b** to **a**, and 
+    an 'off' MM enzyme to convert **a** to **b**
     """
     diffConst = 10e-12 # m^2/sec
     if not moose.exists( parent + '/' + name ):
@@ -607,8 +618,12 @@ def makeChemBistable( name = 'bis', parent = '/library' ):
     a = moose.Pool( compt.path + '/a' )
     b = moose.Pool( compt.path + '/b' )
     c = moose.Pool( compt.path + '/c' )
+    on = moose.Pool( compt.path + '/on' )
+    off = moose.Pool( compt.path + '/off' )
     enz1 = moose.Enz( compt.path + '/b/enz1' )
     enz2 = moose.Enz( compt.path + '/c/enz2' )
+    enz3 = moose.MMenz( compt.path + '/on/enz3' )
+    enz4 = moose.MMenz( compt.path + '/off/enz4' )
     cplx1 = moose.Pool( compt.path + '/b/enz1/cplx' )
     cplx2 = moose.Pool( compt.path + '/c/enz2/cplx' )
     reac = moose.Reac( compt.path + '/reac' )
@@ -624,6 +639,14 @@ def makeChemBistable( name = 'bis', parent = '/library' ):
     moose.connect( enz2, 'enz', c, 'reac' )
     moose.connect( enz2, 'cplx', cplx2, 'reac' )
 
+    moose.connect( enz3, 'sub', b, 'reac' )
+    moose.connect( enz3, 'prd', a, 'reac' )
+    moose.connect( on, 'nOut', enz3, 'enzDest' )
+
+    moose.connect( enz4, 'sub', a, 'reac' )
+    moose.connect( enz4, 'prd', b, 'reac' )
+    moose.connect( off, 'nOut', enz4, 'enzDest' )
+
     moose.connect( reac, 'sub', a, 'reac' )
     moose.connect( reac, 'prd', b, 'reac' )
 
@@ -631,16 +654,24 @@ def makeChemBistable( name = 'bis', parent = '/library' ):
     a.concInit = 1
     b.concInit = 0
     c.concInit = 0.01
+    on.concInit = 0.0
+    off.concInit = 0.0
     enz1.kcat = 0.4
     enz1.Km = 4
     enz2.kcat = 0.6
     enz2.Km = 0.01
     reac.Kf = 0.001
     reac.Kb = 0.01
+    enz3.kcat = 10
+    enz3.Km = 0.01
+    enz4.kcat = 10
+    enz4.Km = 0.01
 
     a.diffConst = diffConst/10
     b.diffConst = diffConst
-    s.diffConst = 0
+    c.diffConst = 0
+    on.diffConst = 0
+    off.diffConst = 0
     return compt
 
 def makeChemOscillator( name = 'osc', parent = '/library' ):
@@ -753,6 +784,9 @@ def makeChemSTD( name = 'STD', parent = '/library' ):
 
 def makeChemLTF( name = 'LTF', parent = '/library' ):
     return makeChemProtoFromFile( 'LTF', name )
+
+def makeChemLTP( name = 'LTP', parent = '/library' ):
+    return makeChemProtoFromFile( 'NN_mapk16', name )
 
 def makeChemLTD( name = 'LTD', parent = '/library' ):
     return makeChemProtoFromFile( 'LTD', name )

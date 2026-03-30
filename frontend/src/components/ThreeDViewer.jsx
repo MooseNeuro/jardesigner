@@ -175,7 +175,7 @@ const ThreeDViewer = (props) => {
       const initialVisibility = {};
       const initialColorRanges = {};
       (threeDConfig?.drawables || []).forEach(d => {
-          initialVisibility[d.groupId] = true;
+          initialVisibility[d.groupId] = d.visible !== false;
           initialColorRanges[d.groupId] = { vmin: d.vmin?.toString() || '0', vmax: d.vmax?.toString() || '0' };
       });
       setDrawableVisibility(initialVisibility);

@@ -1345,6 +1345,30 @@ print( "Wall Clock Time = {:8.2f}, simtime = {:8.3f}".format( time.time() - _sta
             #print( "CCCCCCCCHHHAN: objList = ", objList )
             self.setupMooView.makeMoogli( objList, pdict, chanGroupId )
 
+        # Register spine receptor channels (AMPAR, NMDAR, Ca_conc) as invisible
+        # chan drawables. They are absent from chanDistrib but are physically
+        # present on spine heads for excitatory and excitatory_with_Ca spine
+        # types. visible=False suppresses per-spine icons (which would be
+        # cluttered) while still registering them in the scene graph so that
+        # GUI menus can offer them as relpath options.
+        spineDict = dict( DefaultFdict )
+        spineDict["field"] = "other"
+        spineDict["dataType"] = "chan"
+        spineDict["visible"] = False
+        spineIdx = len( self.chanDistrib )
+        for chanName in ['AMPAR', 'NMDAR', 'Ca_conc']:
+            chanObjs = moose.wildcardFind(
+                f"{self.elecid.path}/#head#/{chanName}" )
+            if len( chanObjs ) == 0:
+                continue
+            headCompts = [c.parent for c in chanObjs]
+            spineDict["relpath"] = chanName
+            spineDict["title"] = "chan_" + chanName
+            spineDict["iconNum"] = spineIdx
+            chanGroupId = f"{chanName}.spine.{spineIdx}"
+            self.setupMooView.makeMoogli( headCompts, spineDict, chanGroupId )
+            spineIdx += 1
+
         pdict["field"] = "other"
         pdict["dataType"] = "adaptor"
         for idx, adname in enumerate( self.adaptorElecComptList ):
@@ -1510,7 +1534,7 @@ print( "Wall Clock Time = {:8.2f}, simtime = {:8.3f}".format( time.time() - _sta
             sx = 3 * FIG_HT
             sy = 3 * FIG_WID
 
-        if self.plotFile.split('.')[-1] == "json":
+        if self.plotFile != None and (self.plotFile.split('.')[-1] == "json"):
             self.plots2json( nrows, ncols, self.plotFile )
             return
 

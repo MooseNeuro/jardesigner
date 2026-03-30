@@ -130,11 +130,21 @@ export const AppLayout = (props) => {
     spinePaths
   } = props;
 
-  // Extract channel names for use in Plots, Stimuli, and Adaptors
-  const channelPrototypes = useMemo(() => 
-    jsonData.chanProto?.map(p => p.name).filter(Boolean) || [], 
-    [jsonData.chanProto]
-  );
+  // Extract channel names for use in Plots, Stimuli, and Adaptors.
+  // Two sources are merged:
+  //   1. jsonData.chanProto — channels the user explicitly defined in the model config.
+  //   2. Scene graph drawables with title "chan_*" — includes spine receptor channels
+  //      (AMPAR, NMDAR, Ca_conc) registered by the engine with visible=false. These
+  //      must be included for relpath selection regardless of their display visibility.
+  const channelPrototypes = useMemo(() => {
+    const fromConfig = jsonData.chanProto?.map(p => p.name).filter(Boolean) || [];
+    const setupDrawables = threeDConfigs?.['setup']?.drawables || [];
+    const fromScene = setupDrawables
+      .filter(d => d.title?.startsWith('chan_'))
+      .map(d => d.title.slice(5))  // strip "chan_" prefix to get the prototype name
+      .filter(Boolean);
+    return [...new Set([...fromConfig, ...fromScene])];
+  }, [jsonData.chanProto, threeDConfigs]);
 
   const menuComponents = useMemo(() => ({
     File: <FileMenuBox setJsonContent={updateJsonString} onClearModel={handleClearModel} getCurrentJsonData={getCurrentJsonData} currentConfig={jsonData.fileinfo} clientId={clientId} />,
