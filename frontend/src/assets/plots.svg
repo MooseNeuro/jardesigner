@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100" height="100">
+  <rect width="100" height="100" fill="white"/>
+
+  <defs>
+    <marker id="axarr" markerWidth="5" markerHeight="4" refX="5" refY="2"
+            orient="auto" markerUnits="userSpaceOnUse">
+      <polygon points="0,0 0,4 5,2" fill="black"/>
+    </marker>
+  </defs>
+
+  <!-- Axes filling more of the icon -->
+  <line x1="8" y1="88" x2="96" y2="88" stroke="black" stroke-width="2"
+        marker-end="url(#axarr)"/>
+  <line x1="8" y1="88" x2="8"  y2="6"  stroke="black" stroke-width="2"
+        marker-end="url(#axarr)"/>
+
+  <!-- Resting-potential tick on Y axis -->
+  <line x1="6" y1="75" x2="10" y2="75" stroke="black" stroke-width="1.5"/>
+
+  <!-- Two action potentials — 2× points for smoother curves.
+       Baseline y=75, AP1 peak y=14, AP2 peak y=18, undershoot y=82. -->
+  <polyline stroke="black" stroke-width="2" fill="none" stroke-linejoin="round"
+    points="
+      12,75
+      22,75  23,74  24,72  25,65  26,50  27,33  28,18  29,14
+      30,16  31,24  32,38  33,56  34,72
+      35,80  36,82  37,82
+      39,80  41,77  44,75
+      52,75
+      53,74  54,72  55,65  56,50  57,33  58,20  59,18
+      60,20  61,28  62,42  63,58  64,73
+      65,81  66,83  67,83
+      69,80  71,77  74,75
+      90,75
+    "/>
+
+</svg>

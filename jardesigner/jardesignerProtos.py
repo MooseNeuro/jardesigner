@@ -174,6 +174,7 @@ def make_HH_K(name = 'HH_K', parent='/library', vmin=-120e-3, vmax=40e-3, vdivs=
 
 #/========================================================================
 #/                Tabchannel Na Hippocampal cell channel
+#/                  Based on Traub 1991
 #/========================================================================
 def make_Na( name ):
     if moose.exists( '/library/' + name ):
@@ -203,6 +204,7 @@ def make_Na( name ):
 
 #========================================================================
 #                Tabchannel K(DR) Hippocampal cell channel
+#/                  Based on Traub 1991
 #========================================================================
 def make_K_DR( name ):
     if moose.exists( '/library/' + name ):

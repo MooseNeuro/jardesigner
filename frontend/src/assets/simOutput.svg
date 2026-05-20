@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100" height="100">
+  <rect width="100" height="100" fill="white"/>
+
+  <!-- Back folder: gray fill + thin gray stroke, visually recessed.
+       Body x=10–82, y=44–82.  Tab x=22–40, y=34–44.
+       Both inner tab step-corners beveled (d=6):
+         left:  (10,44)→(16,44)→(22,38)→(22,34)
+         right: (40,34)→(40,38)→(46,44)→(82,44)            -->
+  <path d="M 10,44 L 16,44 L 22,38 L 22,34
+           L 40,34 L 40,38 L 46,44
+           L 82,44 L 82,82 L 10,82 Z"
+        fill="#ccc" stroke="#777" stroke-width="1.5" stroke-linejoin="miter"/>
+
+  <!-- Arrow to back folder: thin gray, horizontal at y=20, bends at tab centre x=31.
+       Routing at y=20 stays BELOW the front arrow's horizontal (y=8), so the two
+       arrow segments never cross. -->
+  <line x1="5"  y1="20" x2="31" y2="20" stroke="#777" stroke-width="1.5"/>
+  <line x1="31" y1="20" x2="31" y2="26" stroke="#777" stroke-width="1.5"/>
+  <polygon points="27,26 35,26 31,34" fill="#777"/>
+
+  <!-- Front folder: white fill + bold black stroke, visually prominent.
+       Body x=18–90, y=54–90.  Tab x=32–50, y=44–54.
+       White fill occludes the overlapping region of the back folder.
+       Both inner tab corners beveled (d=6):
+         left:  (18,54)→(26,54)→(32,48)→(32,44)
+         right: (50,44)→(50,48)→(56,54)→(90,54)            -->
+  <path d="M 18,54 L 26,54 L 32,48 L 32,44
+           L 50,44 L 50,48 L 56,54
+           L 90,54 L 90,90 L 18,90 Z"
+        fill="white" stroke="black" stroke-width="2" stroke-linejoin="miter"/>
+
+  <!-- Arrow to front folder: thick black, drawn last → always in foreground.
+       Horizontal at y=8 (above back arrow y=20), bends at tab centre x=41.
+       x=41 is outside back folder tab (tab ends at x=40), so the vertical
+       segment clears the back folder tab entirely. -->
+  <line x1="5"  y1="8"  x2="41" y2="8"  stroke="black" stroke-width="2.5"/>
+  <line x1="41" y1="8"  x2="41" y2="32" stroke="black" stroke-width="2.5"/>
+  <polygon points="36,30 46,30 41,46" fill="black"/>
+</svg>

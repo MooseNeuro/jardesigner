@@ -1,17 +1,17 @@
 import React, { useMemo } from 'react';
 import { AppBar, Toolbar, Button, Grid, Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions, Typography, Box } from '@mui/material';
-import runIcon from './assets/run.png';
-import morphoIcon from './assets/morpho.png';
-import spinesIcon from './assets/spines.png';
-import elecIcon from './assets/chan.png';
-import passiveIcon from './assets/passive.png';
-import chemIcon from './assets/chem.png';
-import adaptorsIcon from './assets/adaptors.png';
-import plotsIcon from './assets/plots.png';
-import stimIcon from './assets/stim.png';
-import d3Icon from './assets/3D.png';
-import fileIcon from './assets/file.png';
-import simOutputIcon from './assets/simOutput.png';
+import runIcon from './assets/run.svg';
+import morphoIcon from './assets/morpho.svg';
+import spinesIcon from './assets/spines.svg';
+import elecIcon from './assets/chan.svg';
+import passiveIcon from './assets/passive.svg';
+import chemIcon from './assets/chem.svg';
+import adaptorsIcon from './assets/adaptors.svg';
+import plotsIcon from './assets/plots.svg';
+import stimIcon from './assets/stim.svg';
+import d3Icon from './assets/3D.svg';
+import fileIcon from './assets/file.svg';
+import simOutputIcon from './assets/simOutput.svg';
 import FileMenuBox from './components/MenuBoxes/FileMenuBox';
 import SimOutputMenuBox from './components/MenuBoxes/SimOutputMenuBox';
 import RunMenuBox from './components/MenuBoxes/RunMenuBox';
@@ -113,6 +113,9 @@ export const AppLayout = (props) => {
     handlePauseRun,     // Pause handler
     handleResumeRun,    // Resume handler
     handleResetRun,
+    handleBuildAndStartRun,
+    handleStopRun,
+    setRunParameters,
     isSimulating,
     isPaused,           // Pause state
     activeSim,
@@ -157,11 +160,14 @@ export const AppLayout = (props) => {
     />,
     Run: <RunMenuBox
       onConfigurationChange={updateJsonData}
+      setRunParameters={setRunParameters}
       currentConfig={{ ...jsonData }}
       onStartRun={handleStartRun}
       onPauseRun={handlePauseRun}      // Pass pause handler
       onResumeRun={handleResumeRun}    // Pass resume handler
       onResetRun={handleResetRun}
+      onBuildAndStartRun={handleBuildAndStartRun}
+      onStopRun={handleStopRun}
       isSimulating={isSimulating}
       isPaused={isPaused}              // Pass pause state
       activeSimPid={activeSim.pid}

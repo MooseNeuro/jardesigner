@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100" height="100">
+  <rect width="100" height="100" fill="white"/>
+
+  <defs>
+    <marker id="arr" markerWidth="7" markerHeight="6" refX="7" refY="3"
+            orient="auto" markerUnits="userSpaceOnUse">
+      <polygon points="0,0 0,6 7,3" fill="black"/>
+    </marker>
+  </defs>
+
+  <!-- Ca label -->
+  <text x="50" y="13" text-anchor="middle"
+        font-family="sans-serif" font-size="13" font-weight="bold" fill="black">Ca</text>
+
+  <!-- 45° arrows from Ca: left to triangle apex, right to square top-centre -->
+  <line x1="50" y1="16" x2="26" y2="40"
+        stroke="black" stroke-width="1.8" marker-end="url(#arr)"/>
+  <line x1="50" y1="16" x2="74" y2="40"
+        stroke="black" stroke-width="1.8" marker-end="url(#arr)"/>
+
+  <!-- Triangle (left), apex at (26,40), base at y=54 -->
+  <polygon points="26,40 19,54 33,54" fill="none" stroke="black" stroke-width="2"/>
+
+  <!-- Square (right), top edge at y=40, centered at x=74 -->
+  <rect x="67" y="40" width="14" height="14" fill="none" stroke="black" stroke-width="2"/>
+
+  <!-- Activation arrow: triangle bottom → circle -->
+  <line x1="26" y1="54" x2="44" y2="73"
+        stroke="black" stroke-width="1.8" marker-end="url(#arr)"/>
+
+  <!-- Inhibition plunger: square bottom → circle (with gap)
+       Stem ends at (59,70), ~4 units short of circle edge.
+       Perp unit to stem direction ≈ (0.726, 0.687) -->
+  <!-- Stem -->
+  <line x1="74" y1="54" x2="59" y2="70"
+        stroke="black" stroke-width="1.8"/>
+  <!-- Flat bar (perpendicular to stem, centred on stem endpoint) -->
+  <line x1="54" y1="65" x2="64" y2="75"
+        stroke="black" stroke-width="3"/>
+
+  <!-- Circle at bottom centre -->
+  <circle cx="50" cy="81" r="9" fill="none" stroke="black" stroke-width="2"/>
+</svg>

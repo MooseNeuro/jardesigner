@@ -9,14 +9,19 @@ import time
 import threading
 import shutil
 import re
+import secrets
 from flask import Flask, request, jsonify, send_from_directory, send_file, after_this_request
 from flask_cors import CORS
-from flask_socketio import SocketIO, join_room, leave_room
+from flask_socketio import SocketIO, join_room, leave_room, emit as sock_emit
 from werkzeug.utils import secure_filename
 
 # --- Configuration ---
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 USER_UPLOADS_DIR = os.path.join(BASE_DIR, 'user_uploads')
+
+# Secret shared with simulation subprocesses; never exposed to clients.
+_INTERNAL_SECRET = secrets.token_hex(32)
+_LOOPBACK = {'127.0.0.1', '::1', '::ffff:127.0.0.1'}
 
 os.makedirs(USER_UPLOADS_DIR, exist_ok=True)
 
@@ -36,7 +41,8 @@ app.register_blueprint(allenbrain_routes, url_prefix="/allenbrain")
 # --- Store running process and session info ---
 running_processes = {}
 client_sim_map = {}
-sid_clientid_map = {}
+sid_clientid_map = {}   # sid → client_id
+client_owner_map = {}   # client_id → (sid, session_token)
 
 def stream_printer(stream, pid, stream_name, emit_error_fn=None):
     """
@@ -100,6 +106,40 @@ def terminate_process(pid):
                 del running_processes[pid]
     return False
 
+_UPLOADS_REAL = os.path.realpath(USER_UPLOADS_DIR)
+
+# Extensions accepted for user-uploaded model files.
+_ALLOWED_UPLOAD_EXTENSIONS = {'.swc', '.p', '.g', '.xml', '.sbml', '.nml', '.json'}
+
+def _is_safe_client_id(client_id):
+    """Return True only if client_id resolves to a path within USER_UPLOADS_DIR."""
+    if not isinstance(client_id, str) or not client_id:
+        return False
+    if '..' in client_id or '/' in client_id or '\\' in client_id:
+        return False
+    resolved = os.path.realpath(os.path.join(USER_UPLOADS_DIR, client_id))
+    return resolved.startswith(_UPLOADS_REAL + os.sep)
+
+def _validate_config_sources(config_data):
+    """Return a list of violation strings; empty means the config is safe."""
+    violations = []
+    def _check(section, src):
+        if isinstance(src, str) and (
+            src.startswith('/') or '..' in src or '/' in src or '\\' in src
+        ):
+            violations.append(f"{section}.source={src!r}")
+
+    for section in ('spineProto', 'chanProto', 'chemProto'):
+        for item in config_data.get(section, []):
+            if isinstance(item, dict) and item.get('type') in ('func', 'builtin'):
+                _check(section, item.get('source', ''))
+
+    cp = config_data.get('cellProto')
+    if isinstance(cp, dict) and cp.get('type') == 'func':
+        _check('cellProto', cp.get('source', ''))
+
+    return violations
+
 def get_next_model_filename(directory):
     pattern = re.compile(r'^jardes_model_(\d+)\.json$')
     max_n = 0
@@ -126,10 +166,18 @@ def upload_file():
     client_id = request.form.get('clientId')
     if not client_id:
         return jsonify({"status": "error", "message": "No clientId provided"}), 400
+    if not _is_safe_client_id(client_id):
+        return jsonify({"status": "error", "message": "Invalid client ID"}), 400
     if file.filename == '':
         return jsonify({"status": "error", "message": "No selected file"}), 400
     if file:
         filename = secure_filename(file.filename)
+        ext = os.path.splitext(filename)[1].lower()
+        if ext not in _ALLOWED_UPLOAD_EXTENSIONS:
+            return jsonify({
+                "status": "error",
+                "message": f"File type '{ext}' is not allowed. Permitted: {', '.join(sorted(_ALLOWED_UPLOAD_EXTENSIONS))}"
+            }), 400
         session_dir = os.path.join(USER_UPLOADS_DIR, client_id)
         os.makedirs(session_dir, exist_ok=True)
         save_path = os.path.join(session_dir, filename)
@@ -146,7 +194,12 @@ def handle_sim_command(data):
     try:
         pid = int(pid_str)
     except (ValueError, TypeError): return
+    caller_client_id = sid_clientid_map.get(request.sid)
+    if not caller_client_id:
+        return
     if pid in running_processes:
+        if running_processes[pid].get("client_id") != caller_client_id:
+            return
         process = running_processes[pid]["process"]
         if process.poll() is None:
             try:
@@ -170,6 +223,16 @@ def launch_simulation():
         return jsonify({"status": "error", "message": "Invalid or missing JSON config data"}), 400
     if not client_id:
         return jsonify({"status": "error", "message": "Request is missing client_id"}), 400
+    if not _is_safe_client_id(client_id):
+        return jsonify({"status": "error", "message": "Invalid client ID"}), 400
+
+    violations = _validate_config_sources(config_data)
+    if violations:
+        return jsonify({
+            "status": "error",
+            "message": "Config rejected: source paths must be simple function names, not file paths.",
+            "details": violations
+        }), 400
 
     if not data_channel_id:
         data_channel_id = str(uuid.uuid4())
@@ -205,11 +268,12 @@ def launch_simulation():
     ]
     
     try:
-        env = os.environ.copy() 
+        env = os.environ.copy()
         if 'PYTHONPATH' in env:
             env['PYTHONPATH'] = f"{BASE_DIR}:{env['PYTHONPATH']}"
         else:
             env['PYTHONPATH'] = BASE_DIR
+        env['JARDESIGNER_INTERNAL_TOKEN'] = _INTERNAL_SECRET
         
         #print(f"DEBUG: Launching subprocess for client {client_id} with channel {data_channel_id}")
         
@@ -251,7 +315,7 @@ def launch_simulation():
 
 @app.route('/download_project/<client_id>', methods=['GET'])
 def download_project(client_id):
-    if '..' in client_id or '/' in client_id or '\\' in client_id:
+    if not _is_safe_client_id(client_id):
         return jsonify({"status": "error", "message": "Invalid Client ID"}), 400
 
     session_dir = os.path.join(USER_UPLOADS_DIR, client_id)
@@ -280,12 +344,18 @@ def download_project(client_id):
 
 @app.route('/internal/push_data', methods=['POST'])
 def push_data():
+    if request.remote_addr not in _LOOPBACK:
+        return jsonify({"status": "error", "message": "Forbidden"}), 403
+    if not secrets.compare_digest(
+        request.headers.get('X-Internal-Token', ''), _INTERNAL_SECRET
+    ):
+        return jsonify({"status": "error", "message": "Forbidden"}), 403
     data = request.json
     channel_id = data.get('data_channel_id')
     payload = data.get('payload')
     if not channel_id or payload is None:
         return jsonify({"status": "error", "message": "Missing data_channel_id or payload"}), 400
-    
+
     # Send data without printing (quiet mode)
     socketio.emit('simulation_data', payload, room=channel_id)
     return jsonify({"status": "success"}), 200
@@ -300,22 +370,35 @@ def handle_connect():
 @socketio.on('register_client')
 def handle_register_client(data):
     client_id = data.get('clientId')
-    if client_id:
-        sid_clientid_map[request.sid] = client_id
-        print(f"Registered client {client_id} to SID {request.sid}")
+    if not client_id or not _is_safe_client_id(client_id):
+        return
+    existing = client_owner_map.get(client_id)
+    if existing:
+        # client_id already claimed — require the correct token to take over
+        _, stored_token = existing
+        provided = data.get('sessionToken', '')
+        if not secrets.compare_digest(provided, stored_token):
+            return  # reject: spoofing attempt or stale reconnect without token
+    session_token = secrets.token_hex(16)
+    sid_clientid_map[request.sid] = client_id
+    client_owner_map[client_id] = (request.sid, session_token)
+    sock_emit('session_token', {'token': session_token})
+    print(f"Registered client {client_id} to SID {request.sid}")
 
 @socketio.on('disconnect')
 def handle_disconnect():
-    client_id = sid_clientid_map.get(request.sid)
+    client_id = sid_clientid_map.pop(request.sid, None)
     if client_id:
-        session_dir = os.path.join(USER_UPLOADS_DIR, client_id)
-        if os.path.exists(session_dir):
-            try:
-                shutil.rmtree(session_dir)
-            except Exception as e:
-                print(f"Error deleting session directory {session_dir}: {e}")
-        
-        sid_clientid_map.pop(request.sid, None)
+        owner_sid, _ = client_owner_map.get(client_id, (None, None))
+        if owner_sid == request.sid:
+            # This socket is still the registered owner — safe to clean up.
+            client_owner_map.pop(client_id, None)
+            session_dir = os.path.join(USER_UPLOADS_DIR, client_id)
+            if os.path.exists(session_dir):
+                try:
+                    shutil.rmtree(session_dir)
+                except Exception as e:
+                    print(f"Error deleting session directory {session_dir}: {e}")
         pid = client_sim_map.pop(client_id, None)
         if pid:
             terminate_process(pid)
@@ -351,7 +434,7 @@ def simulation_status(pid):
 
 @app.route('/session_file/<client_id>/<filename>')
 def get_session_file(client_id, filename):
-    if '..' in client_id or '/' in client_id or '..' in filename or filename.startswith('/'):
+    if not _is_safe_client_id(client_id) or '..' in filename or filename.startswith('/'):
         return jsonify({"status": "error", "message": "Invalid path."}), 400
     session_dir = os.path.join(USER_UPLOADS_DIR, client_id)
     return send_from_directory(session_dir, filename)
@@ -363,14 +446,19 @@ def reset_simulation():
     client_id = request_data.get('client_id')
     if not pid_to_reset_str:
         return jsonify({"status": "error", "message": "PID not provided for reset."}), 400
+    if not _is_safe_client_id(client_id):
+        return jsonify({"status": "error", "message": "Invalid client ID."}), 400
     try:
         pid_to_reset = int(pid_to_reset_str)
     except (ValueError, TypeError):
         return jsonify({"status": "error", "message": f"Invalid PID format: {pid_to_reset_str}"}), 400
 
+    proc_info = running_processes.get(pid_to_reset)
+    if proc_info and proc_info.get("client_id") != client_id:
+        return jsonify({"status": "error", "message": "Process ID not found for reset."}), 404
+
     if terminate_process(pid_to_reset):
-        if client_id and client_id in client_sim_map:
-            client_sim_map.pop(client_id, None)
+        client_sim_map.pop(client_id, None)
         return jsonify({"status": "success", "message": f"Simulation PID {pid_to_reset} reset."}), 200
     else:
         return jsonify({"status": "error", "message": "Process ID not found for reset."}), 404

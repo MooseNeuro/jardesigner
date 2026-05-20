@@ -3,6 +3,7 @@ import { Box, Typography, TextField, Grid, Button, CircularProgress, Alert, Divi
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import PauseIcon from '@mui/icons-material/Pause';
 import StopIcon from '@mui/icons-material/Stop';
+import RestartAltIcon from '@mui/icons-material/RestartAlt';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 
 const helpText = {
@@ -12,7 +13,6 @@ const helpText = {
     flags: { turnOffElec: "Disable all electrical calculations.", combineSegments: "Combine adjacent segments with identical properties.", useGssa: "Use Gillespie's Stochastic Simulation Algorithm.", reuseLibraryCell: "Reuse cell from library if available." },
     otherSettings: { modelPath: "Path to the model on the server.", odeMethod: "Method for solving ordinary differential equations.", randSeed: "Seed for random number generation.", temperature: "Simulation temperature in Celsius." }
 };
-
 
 const safeToString = (value, defaultValue = '') => {
     if (value === null || value === undefined) {
@@ -48,19 +48,20 @@ const InfoTooltip = ({ title }) => (
 
 const RunMenuBox = ({
     onConfigurationChange,
-    setRunParameters, // Receive the lightweight updater function
+    setRunParameters,
     currentConfig,
     onStartRun,
-    onPauseRun,       // Pause handler
-    onResumeRun,      // Resume handler
+    onPauseRun,
+    onResumeRun,
     onResetRun,
+    onBuildAndStartRun,
+    onStopRun,
     isSimulating,
-    isPaused,         // Pause state
+    isPaused,
     activeSimPid,
     liveFrameData,
     isReplaying,
 }) => {
-
     const [runtime, setRuntime] = useState(() => safeToString(currentConfig?.runtime, defaultRunConfig.runtime));
     const [clocks, setClocks] = useState(() => ({
         elec: safeToString(currentConfig?.elecDt, defaultRunConfig.elecDt),
@@ -71,44 +72,40 @@ const RunMenuBox = ({
         function: safeToString(currentConfig?.funcDt, defaultRunConfig.funcDt),
         status: safeToString(currentConfig?.statusDt, defaultRunConfig.statusDt),
     }));
-    const [configSettings, setConfigSettings] = useState(() => {
-        return {
-            randSeed: safeToString(currentConfig?.randseed, defaultRunConfig.randseed),
-            temperature: safeToString(currentConfig?.temperature, defaultRunConfig.temperature),
-            modelPath: safeToString(currentConfig?.modelPath, defaultRunConfig.modelPath),
-            odeMethod: safeToString(currentConfig?.odeMethod, defaultRunConfig.odeMethod),
-            turnOffElec: currentConfig?.turnOffElec ?? defaultRunConfig.turnOffElec,
-            useGssa: currentConfig?.useGssa ?? defaultRunConfig.useGssa,
-            combineSegments: currentConfig?.combineSegments ?? defaultRunConfig.combineSegments,
-            reuseLibraryCell: currentConfig?.stealCellFromLibrary ?? defaultRunConfig.stealCellFromLibrary,
-        };
-    });
+    const [configSettings, setConfigSettings] = useState(() => ({
+        randSeed: safeToString(currentConfig?.randseed, defaultRunConfig.randseed),
+        temperature: safeToString(currentConfig?.temperature, defaultRunConfig.temperature),
+        modelPath: safeToString(currentConfig?.modelPath, defaultRunConfig.modelPath),
+        odeMethod: safeToString(currentConfig?.odeMethod, defaultRunConfig.odeMethod),
+        turnOffElec: currentConfig?.turnOffElec ?? defaultRunConfig.turnOffElec,
+        useGssa: currentConfig?.useGssa ?? defaultRunConfig.useGssa,
+        combineSegments: currentConfig?.combineSegments ?? defaultRunConfig.combineSegments,
+        reuseLibraryCell: currentConfig?.stealCellFromLibrary ?? defaultRunConfig.stealCellFromLibrary,
+    }));
 
     const [currentTime, setCurrentTime] = useState(0.0);
     const [statusMessage, setStatusMessage] = useState({ type: '', text: '' });
 
-    // Compute button text based on state
-    const startButtonText = isSimulating 
-        ? 'Running...' 
-        : isPaused 
-            ? 'Continue' 
-            : currentTime > 0 
-                ? 'Continue' 
+    const startButtonText = isSimulating
+        ? 'Running...'
+        : isPaused
+            ? 'Continue'
+            : currentTime > 0
+                ? 'Continue'
                 : 'Start';
 
-    // Compute button states
     const canStart = !isSimulating && !isPaused && activeSimPid;
     const canPause = isSimulating && !isPaused;
     const canResume = isPaused;
 
     const onConfigurationChangeRef = useRef(onConfigurationChange);
     useEffect(() => { onConfigurationChangeRef.current = onConfigurationChange; }, [onConfigurationChange]);
-    
+
     useEffect(() => {
         if (isReplaying) {
             setStatusMessage({ type: 'info', text: 'Replaying simulation in 3D viewer...' });
         } else if (isPaused) {
-            setStatusMessage({ type: 'warning', text: `Simulation paused. Click Continue to resume.` });
+            setStatusMessage({ type: 'warning', text: 'Simulation paused. Click Continue to resume.' });
         } else if (isSimulating) {
             setStatusMessage({ type: 'info', text: `Simulation running (PID: ${activeSimPid})...` });
         } else if (activeSimPid) {
@@ -118,12 +115,12 @@ const RunMenuBox = ({
         }
     }, [isSimulating, isReplaying, isPaused, activeSimPid, currentTime]);
 
-	useEffect(() => {
-    	const frameForRunView = liveFrameData?.run;
-    	if (frameForRunView && typeof frameForRunView.timestamp === 'number') {
-        	setCurrentTime(frameForRunView.timestamp);
-    	}
-	}, [liveFrameData]);
+    useEffect(() => {
+        const frameForRunView = liveFrameData?.run;
+        if (frameForRunView && typeof frameForRunView.timestamp === 'number') {
+            setCurrentTime(frameForRunView.timestamp);
+        }
+    }, [liveFrameData]);
 
     const handleRuntimeChange = (value) => setRuntime(value);
     const updateClock = (field, value) => setClocks((prev) => ({ ...prev, [field]: value }));
@@ -159,53 +156,47 @@ const RunMenuBox = ({
         };
     }, [runtime, clocks, configSettings]);
 
-    // Ref updated every render so the unmount cleanup always calls the latest version.
     const buildConfigPayloadRef = useRef(buildConfigPayload);
     buildConfigPayloadRef.current = buildConfigPayload;
 
-    // Save config to parent only when this menu box is closed (unmounted).
-    // Empty dep array: the cleanup only runs on unmount, not on every local state change.
-    // buildConfigPayloadRef ensures we always call the latest version on unmount.
     useEffect(() => {
         return () => {
             if (onConfigurationChangeRef.current) {
                 onConfigurationChangeRef.current(buildConfigPayloadRef.current());
             }
         };
-    }, []); // eslint-disable-line react-hooks/exhaustive-deps
+    }, []);
 
     const handleStart = () => {
-        // If paused, resume instead of starting fresh
         if (isPaused && onResumeRun) {
             onResumeRun();
             return;
         }
 
         const latestConfig = buildConfigPayload();
-        
-        // For a "Start", trigger the full check-and-rebuild logic.
         if (currentTime === 0) {
-            if (onConfigurationChange) {
-                onConfigurationChange(latestConfig);
+            if (onBuildAndStartRun) {
+                onBuildAndStartRun(latestConfig);
             }
-        } 
-        // For a "Continue", just update the params in the parent state without a rebuild.
-        else {
+        } else {
             if (setRunParameters) {
                 setRunParameters(latestConfig);
             }
-        }
-
-        // In both cases, start the run.
-        if (onStartRun) {
-            onStartRun();
+            if (onStartRun) {
+                onStartRun(latestConfig.runtime);
+            }
         }
     };
 
-    // Pause handler
     const handlePause = () => {
         if (onPauseRun) {
             onPauseRun();
+        }
+    };
+
+    const handleStop = () => {
+        if (onStopRun) {
+            onStopRun();
         }
     };
 
@@ -219,46 +210,58 @@ const RunMenuBox = ({
     return (
         <Box sx={{ p: 2, background: '#f5f5f5', borderRadius: 2 }}>
             <Grid container spacing={1} sx={{ mb: 2 }}>
-                <Grid item xs={4}>
-                    <Button 
-                        variant="contained" 
-                        fullWidth 
-                        startIcon={isSimulating ? <CircularProgress size={20} color="inherit" /> : <PlayArrowIcon />} 
-                        sx={{ 
-                            bgcolor: isPaused ? '#ff9800' : 'success.main',  // Orange when paused
+                <Grid item xs={3}>
+                    <Button
+                        variant="contained"
+                        fullWidth
+                        startIcon={isSimulating ? <CircularProgress size={20} color="inherit" /> : <PlayArrowIcon />}
+                        sx={{
+                            bgcolor: isPaused ? '#ff9800' : 'success.main',
                             '&:hover': { bgcolor: isPaused ? '#f57c00' : 'success.dark' },
                             '&.Mui-disabled': { bgcolor: 'grey.400', color: 'grey.100' }
-                        }} 
-                        onClick={handleStart} 
-                        disabled={isSimulating || (!canStart && !canResume)}  // Enable when can resume
+                        }}
+                        onClick={handleStart}
+                        disabled={isSimulating || (!canStart && !canResume)}
                     >
                         {startButtonText}
                     </Button>
                 </Grid>
-                <Grid item xs={4}>
-                    <Button 
-                        variant="contained" 
-                        fullWidth 
-                        startIcon={<PauseIcon />} 
-                        sx={{ 
-                            bgcolor: '#ffeb3b', 
-                            color: 'rgba(0, 0, 0, 0.87)', 
+                <Grid item xs={3}>
+                    <Button
+                        variant="contained"
+                        fullWidth
+                        startIcon={<PauseIcon />}
+                        sx={{
+                            bgcolor: '#ffeb3b',
+                            color: 'rgba(0, 0, 0, 0.87)',
                             '&:hover': { bgcolor: '#fdd835' },
                             '&.Mui-disabled': { bgcolor: 'grey.300', color: 'rgba(0, 0, 0, 0.26)' }
-                        }} 
-                        onClick={handlePause} 
-                        disabled={!canPause}  // Only enable when simulation is running
+                        }}
+                        onClick={handlePause}
+                        disabled={!canPause}
                     >
                         Pause
                     </Button>
                 </Grid>
-                <Grid item xs={4}>
-                    <Button 
-                        variant="contained" 
-                        fullWidth 
-                        startIcon={<StopIcon />} 
-                        sx={{ bgcolor: 'error.main', '&:hover': { bgcolor: 'error.dark' } }} 
-                        onClick={handleReset} 
+                <Grid item xs={3}>
+                    <Button
+                        variant="contained"
+                        fullWidth
+                        startIcon={<StopIcon />}
+                        sx={{ bgcolor: 'error.main', '&:hover': { bgcolor: 'error.dark' } }}
+                        onClick={handleStop}
+                        disabled={!isSimulating}
+                    >
+                        Stop
+                    </Button>
+                </Grid>
+                <Grid item xs={3}>
+                    <Button
+                        variant="contained"
+                        fullWidth
+                        startIcon={<RestartAltIcon />}
+                        sx={{ bgcolor: '#ffeb3b', color: 'rgba(0, 0, 0, 0.87)', '&:hover': { bgcolor: '#fdd835' } }}
+                        onClick={handleReset}
                         disabled={!activeSimPid}
                     >
                         Reset
@@ -290,7 +293,7 @@ const RunMenuBox = ({
                 <InfoTooltip title={helpText.clocks.main} />
             </Box>
 
-            <Grid container spacing={1.5} sx={{mb: 2}}>
+            <Grid container spacing={1.5} sx={{ mb: 2 }}>
                 <Grid item xs={12} sm={6} container spacing={1.5}>
                     <Grid item xs={12}><Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}><TextField fullWidth size="small" label="Elec Dt (s)" value={clocks.elec} onChange={(e) => updateClock('elec', e.target.value)} /><InfoTooltip title={helpText.clocks.elecDt} /></Box></Grid>
                     <Grid item xs={12}><Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}><TextField fullWidth size="small" label="Chem Dt (s)" value={clocks.chem} onChange={(e) => updateClock('chem', e.target.value)} /><InfoTooltip title={helpText.clocks.chemDt} /></Box></Grid>
@@ -312,10 +315,10 @@ const RunMenuBox = ({
 
             <Typography variant="body2" gutterBottom sx={{ mt: 1, fontWeight: 'medium' }}>Flags</Typography>
             <Grid container spacing={1} rowSpacing={0}>
-                <Grid item xs={6}><Tooltip title={helpText.flags.turnOffElec}><FormControlLabel control={ <Checkbox size="small" checked={configSettings.turnOffElec} onChange={handleTurnOffElecChange} /> } label="Turn Off Elec" /></Tooltip></Grid>
-                <Grid item xs={6}><Tooltip title={helpText.flags.combineSegments}><FormControlLabel control={ <Checkbox size="small" checked={configSettings.combineSegments} onChange={() => updateConfigSetting('combineSegments', !configSettings.combineSegments)} /> } label="Combine Segments" /></Tooltip></Grid>
-                <Grid item xs={6}><Tooltip title={helpText.flags.useGssa}><FormControlLabel control={ <Checkbox size="small" checked={configSettings.useGssa} onChange={() => updateConfigSetting('useGssa', !configSettings.useGssa)} /> } label="Use GSSA" /></Tooltip></Grid>
-                <Grid item xs={6}><Tooltip title={helpText.flags.reuseLibraryCell}><FormControlLabel control={ <Checkbox size="small" checked={configSettings.reuseLibraryCell} onChange={() => updateConfigSetting('reuseLibraryCell', !configSettings.reuseLibraryCell)} /> } label="Reuse Library Cell" /></Tooltip></Grid>
+                <Grid item xs={6}><Tooltip title={helpText.flags.turnOffElec}><FormControlLabel control={<Checkbox size="small" checked={configSettings.turnOffElec} onChange={handleTurnOffElecChange} />} label="Turn Off Elec" /></Tooltip></Grid>
+                <Grid item xs={6}><Tooltip title={helpText.flags.combineSegments}><FormControlLabel control={<Checkbox size="small" checked={configSettings.combineSegments} onChange={() => updateConfigSetting('combineSegments', !configSettings.combineSegments)} />} label="Combine Segments" /></Tooltip></Grid>
+                <Grid item xs={6}><Tooltip title={helpText.flags.useGssa}><FormControlLabel control={<Checkbox size="small" checked={configSettings.useGssa} onChange={() => updateConfigSetting('useGssa', !configSettings.useGssa)} />} label="Use GSSA" /></Tooltip></Grid>
+                <Grid item xs={6}><Tooltip title={helpText.flags.reuseLibraryCell}><FormControlLabel control={<Checkbox size="small" checked={configSettings.reuseLibraryCell} onChange={() => updateConfigSetting('reuseLibraryCell', !configSettings.reuseLibraryCell)} />} label="Reuse Library Cell" /></Tooltip></Grid>
             </Grid>
 
             <Typography variant="body2" gutterBottom sx={{ mt: 2, fontWeight: 'medium' }}>Other Settings</Typography>
@@ -331,7 +334,7 @@ const RunMenuBox = ({
                     </Box>
                 </Grid>
                 <Grid item xs={12} sm={6}>
-                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
                         <TextField fullWidth size="small" label="Rand Seed" type="number" value={configSettings.randSeed} onChange={(e) => updateConfigSetting('randSeed', e.target.value)} />
                         <InfoTooltip title={helpText.otherSettings.randSeed} />
                     </Box>
