@@ -394,7 +394,7 @@ def make_K_AHP( name ):
     K_AHP.Xpower = 0
     K_AHP.Ypower = 0
     K_AHP.Zpower = 1
-    K_AHP.useConcentration = 1
+    K_AHP.useConcentration = bool(1)
 
     zgate = moose.element( K_AHP.path + '/gateZ' )
     xmax = 0.02 # 20 micromolar.
@@ -443,7 +443,7 @@ def make_K_C( name ):
     K_C.Xpower = 1
     K_C.Zpower = 1
     K_C.instant = 4                # Flag: 0x100 means Z gate is instant.
-    K_C.useConcentration = 1
+    K_C.useConcentration = bool(1)
 
     # Now make a X-table for the voltage-dependent activation parameter.
     xgate = moose.element( K_C.path + '/gateX' )

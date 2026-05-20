@@ -30,6 +30,9 @@ socketio = SocketIO(app, cors_allowed_origins="*", logger=False, engineio_logger
 from neuromorpho.neuromorpho_routes import neuromorpho_routes
 app.register_blueprint(neuromorpho_routes, url_prefix="/neuromorpho")
 
+from allenbrain.allenbrain_routes import allenbrain_routes
+app.register_blueprint(allenbrain_routes, url_prefix="/allenbrain")
+
 # --- Store running process and session info ---
 running_processes = {}
 client_sim_map = {}
@@ -132,7 +135,7 @@ def upload_file():
         save_path = os.path.join(session_dir, filename)
         file.save(save_path)
         print(f"Saved file for client {client_id} to {save_path}")
-        return jsonify({"status": "success", "message": "File uploaded successfully"}), 200
+        return jsonify({"status": "success", "filename": filename, "message": "File uploaded successfully"}), 200
     return jsonify({"status": "error", "message": "File upload failed for unknown reasons"}), 500
 
 @socketio.on('sim_command')

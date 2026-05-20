@@ -9,7 +9,9 @@ import ballAndStickIcon from '../../assets/ballAndStick.png';
 import yBranchIcon from '../../assets/ybranch.png';
 import { formatFloat } from '../../utils/formatters.js';
 import { NeuromorphoDialog } from '../neuromorpho/index.js';
+import { AllenBrainDialog } from '../allenbrain/index.js';
 import NMOLOGO from '../../assets/DataRepository/NMOLOGO.png';
+import ABCLOGO from '../../assets/DataRepository/abc_logo.png';
 
 // --- Unit Conversion Helpers ---
 const toMeters = (microns) => {
@@ -187,6 +189,10 @@ const MorphoMenuBox = ({ onConfigurationChange, currentConfig, onFileChange, cli
     const handleOpen = () => setOpen(true);
     const handleClose = () => setOpen(false);
 
+    const [allenOpen, setAllenOpen] = React.useState(false);
+    const handleAllenOpen = () => setAllenOpen(true);
+    const handleAllenClose = () => setAllenOpen(false);
+
     return (
         <Box sx={{ p: 2, background: '#f5f5f5', borderRadius: 2 }}>
             <Tabs value={tabIndex} onChange={handleTabChange} variant="fullWidth">
@@ -204,7 +210,7 @@ const MorphoMenuBox = ({ onConfigurationChange, currentConfig, onFileChange, cli
                             <Button variant="outlined" startIcon={<UploadFileIcon />} onClick={handleFileSelect}>Select Morphology File...</Button>
                             <Tooltip title={helpText.fields.file.source} placement="right"><IconButton size="small"><InfoOutlinedIcon /></IconButton></Tooltip>
                         </Box>
-                        <Box sx={{ mt: 1 }}>
+                        <Box sx={{ mt: 1, display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 1 }}>
                             <Button
                                 component='label'
                                 variant="outlined"
@@ -225,6 +231,28 @@ const MorphoMenuBox = ({ onConfigurationChange, currentConfig, onFileChange, cli
                             <NeuromorphoDialog
                                 open={open}
                                 onClose={handleClose}
+                                clientId={clientId}
+                                onFileChange={onFileChange}
+                            />
+
+                            <Button
+                                variant="outlined"
+                                size="small"
+                                onClick={handleAllenOpen}
+                                startIcon={
+                                    <img
+                                        src={ABCLOGO}
+                                        alt="Allen Brain Cell Types"
+                                        style={{ width: 30, height: 25, objectFit: 'contain' }}
+                                    />
+                                }
+                            >
+                                Allen Brain Cell Type
+                            </Button>
+
+                            <AllenBrainDialog
+                                open={allenOpen}
+                                onClose={handleAllenClose}
                                 clientId={clientId}
                                 onFileChange={onFileChange}
                             />

@@ -833,7 +833,7 @@ print( "Wall Clock Time = {:8.2f}, simtime = {:8.3f}".format( time.time() - _sta
         if meshType == 'dend':
             mesh = moose.NeuroMesh( '/model/chem/' + chemSrc )
             mesh.geometryPolicy = 'cylinder'
-            mesh.separateSpines = 0
+            mesh.separateSpines = bool(0)
         elif meshType == 'spine':
             mesh = self.buildSpineMesh( argList, newChemId, comptDict )
         elif meshType == 'psd':
@@ -861,7 +861,7 @@ print( "Wall Clock Time = {:8.2f}, simtime = {:8.3f}".format( time.time() - _sta
             moose.le( '/model/elec' )
             raise BuildError( "Error: buildSpineMesh: Missing parent NeuroMesh '{}' for spine '{}'".format( dendMeshName, chemSrc ) )
         #print( "COMPT DICT ============", comptDict )
-        moose.element(dendMesh).separateSpines = 1
+        moose.element(dendMesh).separateSpines = bool(1)
         mesh = moose.SpineMesh( '/model/chem/' + chemSrc )
         moose.connect( dendMesh, 'spineListOut', mesh, 'spineList' )
         return mesh
@@ -913,7 +913,7 @@ print( "Wall Clock Time = {:8.2f}, simtime = {:8.3f}".format( time.time() - _sta
         mesh.isMembraneBound = True
         mesh.rScale = radiusRatio
         if meshType == 'endo_axial':
-            mesh.doAxialDiffusion = 1
+            mesh.doAxialDiffusion = bool(1)
             mesh.rPower = 0.5
             mesh.aPower = 0.5
             mesh.aScale = radiusRatio * radiusRatio
@@ -1763,7 +1763,7 @@ print( "Wall Clock Time = {:8.2f}, simtime = {:8.3f}".format( time.time() - _sta
                 func = moose.Function( funcname )
                 func.expr = i['expr']
                 #func.expr = expr
-                func.doEvalAtReinit = 1
+                func.doEvalAtReinit = bool(1)
                 for q in stimObj:
                     moose.connect( func, 'valueOut', q, stimField )
                     #print( "connecting stim: ", func.path, q.path + "[", q.dataIndex, "]." + stimField )
