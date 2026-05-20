@@ -3,7 +3,7 @@ import { Box, Tabs, Tab, Typography, TextField, Grid, Tooltip, IconButton, Butto
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import UploadFileIcon from '@mui/icons-material/UploadFile';
 import helpText from './MorphoMenuBox.Help.json';
-import fileIcon from '../../assets/file.png';
+import fileIcon from '../../assets/file.svg';
 import somaIcon from '../../assets/soma.png';
 import ballAndStickIcon from '../../assets/ballAndStick.png';
 import yBranchIcon from '../../assets/ybranch.png';
