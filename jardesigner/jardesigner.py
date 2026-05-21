@@ -58,6 +58,9 @@ def _stdin_reader():
         try:
             command_data = json.loads(line)
             cmd = command_data.get('command')
+            # Fast-path interrupt only: stop the active MOOSE chunk quickly.
+            # serverCommandLoop remains the single consumer of _cmd_queue
+            # and performs the actual command handling/cleanup.
             if cmd == 'pause':
                 _sim_flags['pause_pending'] = True
                 moose.stop()
@@ -65,10 +68,13 @@ def _stdin_reader():
                 _sim_flags['stop'] = True
                 _sim_flags['reset_pending'] = True
                 moose.stop()
+            elif cmd in ('stop', 'quit'):
+                moose.stop()
         except Exception:
             pass
 
         _cmd_queue.put(line)
+
 
 def _send_time_update_async(sim_time):
     channel_id = _sim_flags['data_channel_id']
