@@ -43,15 +43,31 @@ from . import context
 
 _cmd_queue = queue.Queue()
 _sim_flags = {
-    'stop': False, 'reset_pending': False,
+    'stop': False,
+    'pause_pending': False,
+    'reset_pending': False,
     'last_status_wallclock': 0.0,
     'data_channel_id': None,
 }
+
 _STATUS_URL   = "http://127.0.0.1:5000/internal/push_data"
 _STATUS_TOKEN = os.environ.get('JARDESIGNER_INTERNAL_TOKEN', '')
 
 def _stdin_reader():
     for line in sys.stdin:
+        try:
+            command_data = json.loads(line)
+            cmd = command_data.get('command')
+            if cmd == 'pause':
+                _sim_flags['pause_pending'] = True
+                moose.stop()
+            elif cmd == 'reset':
+                _sim_flags['stop'] = True
+                _sim_flags['reset_pending'] = True
+                moose.stop()
+        except Exception:
+            pass
+
         _cmd_queue.put(line)
 
 def _send_time_update_async(sim_time):
@@ -71,24 +87,11 @@ def _send_time_update_async(sim_time):
     threading.Thread(target=_post, daemon=True).start()
 
 def _pyrun_check():
-    # Check for stop/reset commands from the client
-    try:
-        line = _cmd_queue.get_nowait()
-        try:
-            command_data = json.loads(line)
-            cmd = command_data.get('command')
-            if cmd in ('stop', 'reset'):
-                _sim_flags['stop'] = True
-                if cmd == 'reset':
-                    _sim_flags['reset_pending'] = True
-                moose.stop()
-            else:
-                _cmd_queue.put(line)
-        except Exception:
-            _cmd_queue.put(line)
-    except queue.Empty:
-        pass
-    # Wallclock-gated time update: at most one every 0.5 s
+    if (_sim_flags.get('stop') or
+            _sim_flags.get('pause_pending') or
+            _sim_flags.get('reset_pending')):
+        moose.stop()
+
     now = time.time()
     if now - _sim_flags['last_status_wallclock'] >= 0.5:
         _sim_flags['last_status_wallclock'] = now
@@ -2254,43 +2257,75 @@ _simulation_thread = None
 _is_paused = False
 _remaining_runtime = 0
 _target_simtime = 0
+_SIM_CHUNK_DT = 1.0
+
+def _clear_sim_control_flags():
+    _sim_flags['stop'] = False
+    _sim_flags['pause_pending'] = False
+    _sim_flags['reset_pending'] = False
 
 def _run_simulation(rdes, runtime):
-    """Run MOOSE simulation in a background thread."""
+    """Run MOOSE simulation in interruptible chunks."""
     global _remaining_runtime, _target_simtime, _is_paused
 
-    start_simtime = moose.element("/clock").currentTime
+    runtime = max(0.0, float(runtime))
+    start_simtime = moose.element('/clock').currentTime
     _target_simtime = start_simtime + runtime
 
-    _sim_flags['stop'] = False
-    _sim_flags['reset_pending'] = False
     _sim_flags['last_status_wallclock'] = 0.0
     _sim_flags['data_channel_id'] = rdes.dataChannelId
 
-    moose.start(runtime)
+    while True:
+        current_simtime = moose.element('/clock').currentTime
+        _remaining_runtime = max(0.0, _target_simtime - current_simtime)
 
-    current_simtime = moose.element("/clock").currentTime
-    _remaining_runtime = max(0, _target_simtime - current_simtime)
+        if (_sim_flags['pause_pending'] or
+                _sim_flags['reset_pending'] or
+                _sim_flags['stop'] or
+                _is_paused or
+                _remaining_runtime <= 1e-9):
+            break
+
+        moose.start(min(_SIM_CHUNK_DT, _remaining_runtime))
+
+    current_simtime = moose.element('/clock').currentTime
+    _remaining_runtime = max(0.0, _target_simtime - current_simtime)
 
     stopped = _sim_flags['stop']
+    pause_pending = _sim_flags['pause_pending'] or _is_paused
     reset_pending = _sim_flags['reset_pending']
-    _sim_flags['stop'] = False
-    _sim_flags['reset_pending'] = False
 
     if reset_pending:
         moose.reinit()
+        _remaining_runtime = 0
+        _clear_sim_control_flags()
         return
 
-    if _remaining_runtime <= 1e-9 and not _is_paused and not stopped:
+    if pause_pending:
+        _sim_flags['stop'] = False
+        _sim_flags['pause_pending'] = False
+        return
+
+    _clear_sim_control_flags()
+
+    if _remaining_runtime <= 1e-9 and not stopped:
+        time.sleep(0.05)
+        if (_sim_flags['pause_pending'] or
+                _sim_flags['reset_pending'] or
+                _sim_flags['stop'] or
+                _is_paused):
+            return
+
         rdes.display()
         time.sleep(0.1)
         rdes.runMooView.notifySimulationEnd(rdes.dataChannelId)
+
 
 def _start_simulation_thread(rdes, runtime):
     global _simulation_thread
 
     if _simulation_thread and _simulation_thread.is_alive():
-        return
+        return False
 
     _simulation_thread = threading.Thread(
         target=_run_simulation,
@@ -2298,9 +2333,10 @@ def _start_simulation_thread(rdes, runtime):
         daemon=True
     )
     _simulation_thread.start()
+    return True
 
 def serverCommandLoop(rdes):
-    global _simulation_thread, _is_paused, _remaining_runtime
+    global _simulation_thread, _is_paused, _remaining_runtime, _target_simtime
 
     reader_thread = threading.Thread(target=_stdin_reader, daemon=True)
     reader_thread.start()
@@ -2309,34 +2345,41 @@ def serverCommandLoop(rdes):
         try:
             line = _cmd_queue.get()
             command_data = json.loads(line)
-            command = command_data.get("command")
+            command = command_data.get('command')
 
-            if command == "start":
-                runtime = command_data.get("params", {}).get("runtime", rdes.runtime)
-                if moose.element("/clock").currentTime == 0:
+            if command == 'start':
+                runtime = command_data.get('params', {}).get('runtime', rdes.runtime)
+                runtime = float(runtime)
+                if moose.element('/clock').currentTime == 0:
                     if hasattr(rdes, 'moogli') and len(rdes.moogli) > 0:
-                        rdes.runMooView.sendSceneGraph("run")
+                        rdes.runMooView.sendSceneGraph('run')
 
+                _clear_sim_control_flags()
                 _is_paused = False
                 _remaining_runtime = runtime
                 _start_simulation_thread(rdes, runtime)
 
-            elif command == "pause":
+            elif command == 'pause':
                 if _simulation_thread and _simulation_thread.is_alive():
                     _is_paused = True
+                    _sim_flags['pause_pending'] = True
                     moose.stop()
-                    _simulation_thread.join(timeout=2.0)
-                    current_time = moose.element("/clock").currentTime
-                    _remaining_runtime = max(0, _target_simtime - current_time)
-                    print(f"Paused at t={current_time:.4f}s", flush=True)
+                    _simulation_thread.join(timeout=5.0)
 
-            elif command == "resume":
+                    current_time = moose.element('/clock').currentTime
+                    _remaining_runtime = max(0.0, _target_simtime - current_time)
+                    _sim_flags['stop'] = False
+                    _sim_flags['pause_pending'] = False
+                    print(f'Paused at t={current_time:.4f}s', flush=True)
+
+            elif command == 'resume':
                 if _is_paused and _remaining_runtime > 1e-9:
+                    _clear_sim_control_flags()
                     _is_paused = False
                     _start_simulation_thread(rdes, _remaining_runtime)
-                    print("Simulation resumed", flush=True)
+                    print('Simulation resumed', flush=True)
 
-            elif command == "stop":
+            elif command == 'stop':
                 if _simulation_thread and _simulation_thread.is_alive():
                     _sim_flags['stop'] = True
                     _is_paused = False
@@ -2344,20 +2387,23 @@ def serverCommandLoop(rdes):
                     moose.stop()
                     _simulation_thread.join(timeout=2.0)
 
-            elif command == "reset":
-                if _simulation_thread and _simulation_thread.is_alive():
-                    _sim_flags['reset_pending'] = True
-                    moose.stop()
-                    _simulation_thread.join(timeout=2.0)
+            elif command == 'reset':
+                _sim_flags['reset_pending'] = True
+                _sim_flags['stop'] = True
                 _is_paused = False
                 _remaining_runtime = 0
-                moose.reinit()
-
-            elif command == "quit":
+                moose.stop()
                 if _simulation_thread and _simulation_thread.is_alive():
-                    _sim_flags['stop'] = True
-                    moose.stop()
-                    _simulation_thread.join(timeout=2.0)
+                    _simulation_thread.join(timeout=5.0)
+                moose.reinit()
+                _clear_sim_control_flags()
+
+            elif command == 'quit':
+                _sim_flags['stop'] = True
+                _is_paused = False
+                moose.stop()
+                if _simulation_thread and _simulation_thread.is_alive():
+                    _simulation_thread.join(timeout=5.0)
                 print("Received 'quit' command. Exiting.")
                 break
 
@@ -2368,6 +2414,7 @@ def serverCommandLoop(rdes):
             print(f"Warning: Received non-JSON command: {line.strip()}")
 
         sys.stdout.flush()
+
 
 def main():
     try:
