@@ -1,5 +1,6 @@
-import eventlet
-eventlet.monkey_patch()
+from gevent import monkey
+monkey.patch_all()
+
 import os
 import sys
 import subprocess
@@ -31,7 +32,7 @@ app = Flask(__name__)
 CORS(app)
 
 # Quiet logging
-socketio = SocketIO(app, cors_allowed_origins="*", logger=False, engineio_logger=False)
+socketio = SocketIO(app, cors_allowed_origins="*", logger=False, engineio_logger=False, async_mode='gevent')
 
 from neuromorpho.neuromorpho_routes import neuromorpho_routes, stage_neuron as _nm_stage
 from neuromorpho.neuromorpho import search_neurons, fetch_neuron_by_id as _nm_fetch_by_id, neuron_to_item as _nm_to_item
