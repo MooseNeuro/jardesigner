@@ -2258,31 +2258,6 @@ def randomPlacementFunc( numModels, idx ):
     nx = int( np.sqrt( numModels ) )
     return np.random.random()*0.5e-3, np.random.random()*0.5e-3, 0.0
 
-# ============================================================================
-# Pause/Resume Threading Support
-# ============================================================================
-_simulation_thread = None
-_is_paused = False
-_remaining_runtime = 0
-_target_simtime = 0
-
-def _run_simulation(rdes, runtime):
-    """Run MOOSE simulation in background thread."""
-    global _remaining_runtime, _target_simtime, _is_paused
-    
-    start_simtime = moose.element("/clock").currentTime
-    _target_simtime = start_simtime + runtime
-    
-    moose.start(runtime)
-    
-    current_simtime = moose.element("/clock").currentTime
-    _remaining_runtime = max(0, _target_simtime - current_simtime)
-    
-    if _remaining_runtime <= 1e-9 and not _is_paused:
-        rdes.display()
-        time.sleep(0.1)
-        rdes.runMooView.notifySimulationEnd(rdes.dataChannelId)
-
 def serverCommandLoop( rdes ):
     reader_thread = threading.Thread(target=_stdin_reader, daemon=True)
     reader_thread.start()
@@ -2317,17 +2292,9 @@ def serverCommandLoop( rdes ):
                 moose.stop()
 
             elif command == "reset":
-                if _simulation_thread and _simulation_thread.is_alive():
-                    moose.stop()
-                    _simulation_thread.join(timeout=2.0)
-                _is_paused = False
-                _remaining_runtime = 0
                 moose.reinit()
 
             elif command == "quit":
-                if _simulation_thread and _simulation_thread.is_alive():
-                    moose.stop()
-                    _simulation_thread.join(timeout=2.0)
                 print("Received 'quit' command. Exiting.")
                 break
             else:

@@ -51,13 +51,10 @@ const RunMenuBox = ({
     setRunParameters,
     currentConfig,
     onStartRun,
-    onPauseRun,       // Pause handler
-    onResumeRun,      // Resume handler
     onResetRun,
     onBuildAndStartRun,
     onStopRun,
     isSimulating,
-    isPaused,         // Pause state
     activeSimPid,
     liveFrameData,
     isReplaying,
@@ -92,8 +89,6 @@ const RunMenuBox = ({
     // Compute button text based on state
     const startButtonText = isSimulating 
         ? 'Running...' 
-        : isPaused 
-            ? 'Continue' 
             : currentTime > 0 
                 ? 'Continue' 
                 : 'Start';
@@ -107,8 +102,6 @@ const RunMenuBox = ({
     useEffect(() => {
         if (isReplaying) {
             setStatusMessage({ type: 'info', text: 'Replaying simulation in 3D viewer...' });
-        } else if (isPaused) {
-            setStatusMessage({ type: 'warning', text: `Simulation paused. Click Continue to resume.` });
         } else if (isSimulating) {
             setStatusMessage({ type: 'info', text: `Simulation running (PID: ${activeSimPid})...` });
         } else if (activeSimPid) {
@@ -116,7 +109,7 @@ const RunMenuBox = ({
         } else {
             setStatusMessage({ type: 'info', text: 'No active simulation. Change a setting to build the model.' });
         }
-    }, [isSimulating, isReplaying, isPaused, activeSimPid, currentTime]);
+    }, [isSimulating, isReplaying, activeSimPid, currentTime]);
 
 	useEffect(() => {
     	const frameForRunView = liveFrameData?.run;
@@ -227,12 +220,6 @@ const RunMenuBox = ({
     }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
     const handleStart = () => {
-        // If paused, resume instead of starting fresh
-        if (isPaused && onResumeRun) {
-            onResumeRun();
-            return;
-        }
-
         const latestConfig = buildConfigPayload();
         if (currentTime === 0) {
             // New start: delegate to parent which decides if rebuild is needed.

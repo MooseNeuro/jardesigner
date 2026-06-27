@@ -2,7 +2,6 @@
   "main": "This section controls the execution of the simulation and global configuration parameters.",
   "runControls": {
     "start": "Saves the current configuration and starts the simulation from the beginning.",
-    "pause": "Pauses the currently running simulation. Not yet implemented.",
     "reset": "Stops the simulation and resets the simulation time to zero.",
     "totalRuntime": "The total duration of the simulation in seconds.",
     "currentTime": "The current elapsed time of the running simulation."

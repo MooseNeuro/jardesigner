@@ -97,7 +97,6 @@ export const useAppLogic = () => {
     const [plotError, setPlotError] = useState('');
     const [simError, setSimError] = useState(null);
     const [isSimulating, setIsSimulating] = useState(false);
-    const [isPaused, setIsPaused] = useState(false);  // Pause state
     const [clientId] = useState(() => uuidv4());
     const sessionTokenRef = useRef('');
 
@@ -240,7 +239,6 @@ export const useAppLogic = () => {
 
         const onSimulationEnded = () => {
             setIsSimulating(false);
-            setIsPaused(false);  // Reset pause state when simulation ends
             frameQueueRef.current = [];
             const currentFilename = activeSimRef.current.plot_filename;
             if (currentFilename) {
