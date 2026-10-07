@@ -69,10 +69,10 @@ const decodeExprForField = (field, schemaType, storedExpr) => {
 };
 
 // Encode display expression back to SI for JSON storage
-const encodeExprForField = (field, displayExpr, exprInSI) => {
+const encodeExprForField = (field, schemaType, displayExpr, exprInSI) => {
     if (!displayExpr) return '';
     const invScale = FIELD_INV_SCALE[field];
-    if (invScale && !exprInSI) return `(${displayExpr})*${invScale}`;
+    if (invScale && schemaType === 'field' && !exprInSI) return `(${displayExpr})*${invScale}`;
     return displayExpr;
 };
 
@@ -351,7 +351,7 @@ const StimMenuBox = ({
                 }
             }
             
-            const storedExpr = encodeExprForField(stimState.field, stimState.stimulusExpression || '', stimState.exprInSI);
+            const storedExpr = encodeExprForField(stimState.field, schemaType, stimState.stimulusExpression || '', stimState.exprInSI);
             const stimSchemaItemBase = {
                 type: schemaType,
                 path: stimState.path || "soma",
