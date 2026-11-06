@@ -11,7 +11,7 @@ const PAGE_SIZE_OPTIONS = [20, 50, 100];
 const toItem = (row) => ({
     id:          `icg_${row.modeldb_id}_${row.suffix}`,
     name:        `${row.suffix}_${row.modeldb_id}`,
-    source:      `ICG/${row.ion_class || ''}`,
+    source:      row.source || 'ICG',
     description: row.description || [row.title, row.year ? `(${row.year})` : ''].filter(Boolean).join(' '),
     source_type: 'file',
     server_file: `${row.suffix}_${row.modeldb_id}`,
